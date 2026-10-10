@@ -1,0 +1,267 @@
+// Prisma schema for 个人知识库 V1.0 (SQLite)
+// SQLite 不支持 enum，所有枚举字段使用 String + @default 文本值，并通过应用层校验。
+// FTS5 与 sqlite-vss 虚表通过迁移 SQL（$queryRaw）管理，详见 docs/architecture.md §5。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id
+  email             String?  @unique
+  phone             String?  @unique
+  passwordHash      String   @map("password_hash")
+  nickname          String
+  avatarUrl         String?  @map("avatar_url")
+  bio               String?
+  status            String   @default("active") // active | locked | deleted_pending
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  lastLoginAt       DateTime? @map("last_login_at")
+  quotaDailyLimit   Int      @default(50) @map("quota_daily_limit")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  categories        Category[]
+  tags              Tag[]
+  notes             Note[]
+  conversations     Conversation[]
+  refreshTokens     RefreshToken[]
+  quotaDailies      QuotaDaily[]
+  attachments       Attachment[]
+  auditLogs         AuditLog[] @relation("UserAuditLogs")
+
+  @@index([status])
+  @@map("users")
+}
+
+model Category {
+  id        String    @id
+  userId    String    @map("user_id")
+  name      String
+  parentId  String?   @map("parent_id")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  notes     Note[]
+
+  @@index([userId, parentId, sortOrder])
+  @@map("categories")
+}
+
+model Tag {
+  id        String    @id
+  userId    String    @map("user_id")
+  name      String
+  color     String    @default("#6366F1")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     NoteTag[]
+
+  @@unique([userId, name], name: "uk_tags_user_name")
+  @@map("tags")
+}
+
+model Note {
+  id               String     @id
+  userId           String     @map("user_id")
+  title            String
+  content          String     @default("")
+  format           String     @default("markdown") // markdown | richtext
+  summary          String?
+  wordCount        Int        @default(0) @map("word_count")
+  categoryId       String?    @map("category_id")
+  status           String     @default("draft") // draft | published | archived
+  isPinned         Boolean    @default(false) @map("is_pinned")
+  hasAttachment    Boolean    @default(false) @map("has_attachment")
+  deletedAt        DateTime?  @map("deleted_at")
+  deletedExpiresAt DateTime?  @map("deleted_expires_at")
+  version          Int        @default(1)
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  publishedAt      DateTime?  @map("published_at")
+
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         Category?  @relation(fields: [categoryId], references: [id])
+  tags             NoteTag[]
+  versions         NoteVersion[]
+  chunks           NoteChunk[]
+  attachments      Attachment[]
+
+  @@index([userId, status, updatedAt])
+  @@index([userId, categoryId])
+  @@index([userId, isPinned, updatedAt])
+  @@map("notes")
+}
+
+model NoteTag {
+  noteId    String   @map("note_id")
+  tagId     String   @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId])
+  @@map("note_tags")
+}
+
+model NoteVersion {
+  id          String   @id
+  noteId      String   @map("note_id")
+  version     Int
+  title       String
+  content     String
+  wordCount   Int?     @map("word_count")
+  diffSummary String?  @map("diff_summary")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  note        Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, version])
+  @@index([noteId, createdAt])
+  @@map("note_versions")
+}
+
+model NoteChunk {
+  id              String   @id
+  noteId          String   @map("note_id")
+  userId          String   @map("user_id")
+  chunkIndex      Int      @map("chunk_index")
+  content         String
+  headingPath     String?  @map("heading_path")
+  charStart       Int?     @map("char_start")
+  charEnd         Int?     @map("char_end")
+  tokenCount      Int?     @map("token_count")
+  embeddingModel  String?  @map("embedding_model")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  note            Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, chunkIndex])
+  @@index([userId, noteId])
+  @@index([userId, updatedAt])
+  @@map("note_chunks")
+}
+
+model Conversation {
+  id              String    @id
+  userId          String    @map("user_id")
+  title           String
+  scopeNoteIds    String?   @map("scope_note_ids")
+  scopeCategoryId String?   @map("scope_category_id")
+  scopeTagIds     String?   @map("scope_tag_ids")
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        Message[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id               String      @id
+  convId           String      @map("conv_id")
+  userId           String      @map("user_id")
+  role             String      // user | assistant | system
+  content          String
+  references       String?
+  tokensPrompt     Int?        @map("tokens_prompt")
+  tokensCompletion Int?        @map("tokens_completion")
+  latencyMs        Int?        @map("latency_ms")
+  model            String?
+  feedback         String?     // up | down | null
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  conversation     Conversation @relation(fields: [convId], references: [id], onDelete: Cascade)
+
+  @@index([convId, createdAt])
+  @@map("messages")
+}
+
+model RefreshToken {
+  id        String   @id
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  userAgent String?  @map("user_agent")
+  ip        String?
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("refresh_tokens")
+}
+
+model QuotaDaily {
+  id        String @id
+  userId    String @map("user_id")
+  date      String
+  used      Int    @default(0)
+  limit     Int    @default(50)
+
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("quota_daily")
+}
+
+model AuditLog {
+  id         String      @id
+  userId     String?     @map("user_id")
+  action     String
+  targetType String?     @map("target_type")
+  targetId   String?     @map("target_id")
+  ip         String?
+  userAgent  String?     @map("user_agent")
+  result     String      // success | fail
+  errorCode  String?     @map("error_code")
+  detail     String?
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  user       User?       @relation("UserAuditLogs", fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model Attachment {
+  id           String   @id
+  userId       String   @map("user_id")
+  noteId       String?  @map("note_id")
+  originalName String   @map("original_name")
+  storedPath   String   @map("stored_path")
+  mimeType     String   @map("mime_type")
+  size         Int
+  width        Int?
+  height       Int?
+  sha256       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note         Note?    @relation(fields: [noteId], references: [id], onDelete: SetNull)
+
+  @@index([userId, noteId])
+  @@map("attachments")
+}

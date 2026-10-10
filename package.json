@@ -1,0 +1,25 @@
+{
+  "name": "knowledge-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "个人知识库 V1.0 — 基于 NestJS + React + SQLite 的轻量自托管知识管理与 RAG 问答系统",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.10.0",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter=./server --filter=./web run dev",
+    "build": "pnpm -r --filter=./server --filter=./web run build",
+    "lint": "pnpm -r run lint",
+    "clean": "pnpm -r exec rm -rf dist node_modules/.cache .turbo",
+    "server:dev": "pnpm --filter server dev",
+    "server:build": "pnpm --filter server build",
+    "server:start": "pnpm --filter server start:prod",
+    "web:dev": "pnpm --filter web dev",
+    "web:build": "pnpm --filter web build",
+    "db:migrate": "pnpm --filter server prisma:migrate",
+    "db:generate": "pnpm --filter server prisma:generate",
+    "db:studio": "pnpm --filter server prisma:studio"
+  }
+}
