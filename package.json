@@ -20,6 +20,9 @@
     "web:build": "pnpm --filter web build",
     "db:migrate": "pnpm --filter server prisma:migrate",
     "db:generate": "pnpm --filter server prisma:generate",
-    "db:studio": "pnpm --filter server prisma:studio"
+    "db:studio": "pnpm --filter server prisma:studio",
+    "e2e": "pnpm --filter e2e test",
+    "e2e:smoke": "pnpm --filter e2e test:smoke",
+    "e2e:report": "pnpm --filter e2e report"
   }
 }

@@ -1,3 +1,4 @@
 packages:
   - 'server'
   - 'web'
+  - 'e2e'
