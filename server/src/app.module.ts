@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { JwtModule } from '@nestjs/jwt';
 import { configuration } from './common/config/configuration';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -29,6 +30,14 @@ import { MailModule } from './modules/mail/mail.module';
       isGlobal: true,
       load: [configuration],
       envFilePath: ['.env', '../.env'],
+    }),
+    JwtModule.registerAsync({
+      global: true,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('jwtSecret'),
+        signOptions: { expiresIn: config.get<string>('jwtAccessTtl') ?? '2h' },
+      }),
     }),
     PrismaModule,
     HealthModule,
