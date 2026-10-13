@@ -1,28 +1,40 @@
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Workbench from './pages/Workbench';
+import AppLayout from './layouts/AppLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import { useAuthStore } from './stores/auth';
 
 export default function App() {
+  const hydrate = useAuthStore((s) => s.hydrate);
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="border-b bg-white px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-6 h-6 rounded bg-brand" />
-          <h1 className="font-semibold text-lg">个人知识库</h1>
-        </div>
-        <nav className="flex gap-4 text-sm text-slate-600">
-          <Link to="/app" className="hover:text-brand">工作台</Link>
-          <Link to="/login" className="hover:text-brand">登录</Link>
-        </nav>
-      </header>
-      <main>
-        <Routes>
-          <Route path="/" element={<Navigate to="/app" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/app" element={<Workbench />} />
-          <Route path="*" element={<div className="p-8">页面不存在</div>} />
-        </Routes>
-      </main>
-    </div>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/workbench" element={<Workbench />} />
+      </Route>
+      <Route path="/" element={<Navigate to="/workbench" replace />} />
+      <Route
+        path="*"
+        element={
+          <div className="min-h-screen flex items-center justify-center text-slate-500">
+            页面不存在
+          </div>
+        }
+      />
+    </Routes>
   );
 }

@@ -15,11 +15,13 @@ model User {
   id                String   @id
   email             String?  @unique
   phone             String?  @unique
-  passwordHash      String   @map("password_hash")
+  passwordHash      String   @map("password_hash") // 短信即注册即登录场景写占位 argon2 hash（不可匹配任何密码）
   nickname          String
   avatarUrl         String?  @map("avatar_url")
   bio               String?
   status            String   @default("active") // active | locked | deleted_pending
+  failedAttempts    Int      @default(0) @map("failed_attempts")
+  lockedUntil       DateTime? @map("locked_until")
   emailVerifiedAt   DateTime? @map("email_verified_at")
   lastLoginAt       DateTime? @map("last_login_at")
   quotaDailyLimit   Int      @default(50) @map("quota_daily_limit")
@@ -35,9 +37,31 @@ model User {
   quotaDailies      QuotaDaily[]
   attachments       Attachment[]
   auditLogs         AuditLog[] @relation("UserAuditLogs")
+  smsCodes          SmsCode[]
 
   @@index([status])
+  @@index([email])
+  @@index([phone])
   @@map("users")
+}
+
+model SmsCode {
+  id          String    @id
+  phone       String
+  scene       String    // register | login
+  codeHash    String    @map("code_hash")
+  expiresAt   DateTime  @map("expires_at")
+  failCount   Int       @default(0) @map("fail_count")
+  dailyCount  Int       @default(0) @map("daily_count")
+  lastSentAt  DateTime? @map("last_sent_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  userId      String?   @map("user_id")
+
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([phone, scene, createdAt])
+  @@map("sms_codes")
 }
 
 model Category {
@@ -229,6 +253,7 @@ model QuotaDaily {
 model AuditLog {
   id         String      @id
   userId     String?     @map("user_id")
+  account    String?     // 脱敏账号标识
   action     String
   targetType String?     @map("target_type")
   targetId   String?     @map("target_id")
@@ -236,6 +261,7 @@ model AuditLog {
   userAgent  String?     @map("user_agent")
   result     String      // success | fail
   errorCode  String?     @map("error_code")
+  reason     String?
   detail     String?
   createdAt  DateTime    @default(now()) @map("created_at")
 

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { configuration } from './common/config/configuration';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { CommonModule } from './common/common.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -31,6 +32,7 @@ import { MailModule } from './modules/mail/mail.module';
       envFilePath: ['.env', '../.env'],
     }),
     PrismaModule,
+    CommonModule,
     HealthModule,
     AuthModule,
     UserModule,
